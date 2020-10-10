@@ -28,19 +28,6 @@ if ((Test-Path -Path $contributorsMDFile)) {
 }
 New-Item -ItemType "file" -Path $contributorsMDFile
 
-#Check if the author exists in the specified organization。
-#If yes return ture else retun false.
-function IsAuthorExistOrg($authorOrgs, $orgLogin) {
-    foreach($org in $authorOrgs)
-    {
-        if ($org.login -eq $orgLogin)
-        {
-            return $true
-        }
-    }
-    return $false
-}
-
 $commitsUrl = "https://api.github.com/repos/Azure/azure-powershell/commits?since=$SinceDate&sha=$Branch"
 $token = ConvertTo-SecureString $AccessToken -AsPlainText -Force
 # Get last page number of commints.
