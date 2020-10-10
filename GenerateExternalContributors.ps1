@@ -49,7 +49,7 @@ $sortPRs = $PRs | Sort-Object -Property @{Expression = {$_.author.login}; Descen
 $skipContributors = @('aladdindoc')
 
 $contributorsMDHeaderFlag = $True
-for($PR = 0; $PR -lt $sortPRs.Length; $PR++) {
+for ($PR = 0; $PR -lt $sortPRs.Length; $PR++) {
     if ($skipContributors.Contains($sortPRs[$PR].author.login))
     {
         continue
@@ -67,7 +67,7 @@ for($PR = 0; $PR -lt $sortPRs.Length; $PR++) {
     $account = $sortPRs[$PR].author.login
     $name = $sortPRs[$PR].commit.author.name
     $index = $sortPRs[$PR].commit.message.IndexOf("`n`n")
-    if($index -lt 0) {
+    if ($index -lt 0) {
         $commitMessage = $sortPRs[$PR].commit.message
     } else {
         $commitMessage = $sortPRs[$PR].commit.message.Substring(0, $index)
