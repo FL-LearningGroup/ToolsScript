@@ -10,16 +10,50 @@ Invoke-WebRequest: https://docs.microsoft.com/en-us/powershell/module/microsoft.
 Invoke-RestMethod: https://docs.microsoft.com/en-us/powershell/module/Microsoft.PowerShell.Utility/Invoke-RestMethod?view=powershell-7
 #>
 param(
-    [Parameter(Mandatory, HelpMessage="Since date of the PR commit. example value: 2020-08-18T00:00:00Z")]
-    [string]
-    $SinceDate, 
-    [Parameter(Mandatory)]
-    [string]
-    $Branch,
     [Parameter(Mandatory)]
     [string]
     $AccessToken
 )
+$SinceDate = (Get-Date).AddDays(-28)
+$SinceDateStr =  $SinceDate.ToString('yyyy-MM-ddTHH:mm:ssZ')
+$Branch = git branch --show-current # The Git 2.22 and above support.
+$rootPath = "$PSScriptRoot\.."
+$changeLogFile = Get-Item -Path "..\ChangeLog.md"
+$changeLogContent = Get-Content -Path $changeLogFile.FullName
+$existCommitsId = @()
+$addCommitSwitch = $False
+# Get alread exist commit from the ChangeLogContent.md
+foreach ($changelog in $changeLogContent)
+{
+    # Get datetime of the az release
+    if ($changelog -match '^#{2} [0-9]+.[0-9]+.[0-9]+')
+    {
+        if ([DateTime]::Parse($changelog.Substring(($changelog.IndexOf('-'))+2)) -lt $SinceDate)
+        {
+            break;
+        }
+        $addCommitSwitch = $False
+    }
+    if ($changelog -match '^#{4} Az')
+    {
+        $addCommitSwitch = $False
+    }
+    # Set switch to get all commits under the 'Thanks to our community contributors'
+    if (($changeLog -match '^#{3} Thanks to our community contributors'))
+    {
+        $addCommitSwitch = $True
+    }
+
+    # Add commit id
+    if ($addCommitSwitch)
+    {
+        if ($changeLog -match '(#[0-9]+)') 
+        {
+            $existCommitsId += $changeLog.Substring($changeLog.LastIndexOf('('))
+        }
+    }
+}
+
 Write-Host -ForegroundColor Green 'Create ExternalContributors.md'
 # Create md file to store contributors information.
 $contributorsMDFile = Join-Path $PSScriptRoot 'ExternalContributors.md'
@@ -28,7 +62,7 @@ if ((Test-Path -Path $contributorsMDFile)) {
 }
 New-Item -ItemType "file" -Path $contributorsMDFile
 
-$commitsUrl = "https://api.github.com/repos/Azure/azure-powershell/commits?since=$SinceDate&sha=$Branch"
+$commitsUrl = "https://api.github.com/repos/Azure/azure-powershell/commits?since=$SinceDateStr&sha=$Branch"
 $token = ConvertTo-SecureString $AccessToken -AsPlainText -Force
 # Get last page number of commints.
 $commintsPagesLink = (Invoke-WebRequest -Uri $commitsUrl -Authentication Bearer -Token $token).Headers.Link
@@ -56,6 +90,8 @@ for ($PR = 0; $PR -lt $sortPRs.Length; $PR++) {
     }
     Invoke-RestMethod -Uri "https://api.github.com/orgs/Azure/members/$($sortPRs[$PR].author.login)" -Authentication Bearer -Token $token -ResponseHeadersVariable 'ResponseHeaders' -StatusCodeVariable 'StatusCode' -SkipHttpErrorCheck > $null
     if ($StatusCode -eq '204') {
+        # Add internal contributors to skipContributors to reduce the number of https requests sent.
+        $skipContributors += $sortPRs[$PR].author.login
         continue
     }
     if ($contributorsMDHeaderFlag) {
@@ -72,6 +108,15 @@ for ($PR = 0; $PR -lt $sortPRs.Length; $PR++) {
     } else {
         $commitMessage = $sortPRs[$PR].commit.message.Substring(0, $index)
     }
+    # Skip already exits commits.
+    if ($existCommitsId.Contains($commitMessage.Substring($commitMessage.LastIndexOf('('))))
+    {
+        # Only one of the multiple commits of the same user in this release is valuable.
+        # For display format of the external contributors. 
+        $sortPRs[$PR].author.login = 'CommitSkip'
+        continue
+    }
+
     # The contributor hase many commits.
     if ( ($account -eq $sortPRs[$PR - 1].author.login) -or ($account -eq $sortPRs[$PR + 1].author.login)) {
         # Firt commit.
