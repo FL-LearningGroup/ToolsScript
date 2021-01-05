@@ -19,40 +19,7 @@ $SinceDateStr =  $SinceDate.ToString('yyyy-MM-ddTHH:mm:ssZ')
 $Branch = git branch --show-current # The Git 2.22 and above support.
 $rootPath = "$PSScriptRoot\.."
 $changeLogFile = Get-Item -Path "..\ChangeLog.md"
-$changeLogContent = Get-Content -Path $changeLogFile.FullName
-$existCommitsId = @()
-$addCommitSwitch = $False
-# Get alread exist commit from the ChangeLogContent.md
-foreach ($changelog in $changeLogContent)
-{
-    # Get datetime of the az release
-    if ($changelog -match '^#{2} [0-9]+.[0-9]+.[0-9]+')
-    {
-        if ([DateTime]::Parse($changelog.Substring(($changelog.IndexOf('-'))+2)) -lt $SinceDate)
-        {
-            break;
-        }
-        $addCommitSwitch = $False
-    }
-    if ($changelog -match '^#{4} Az')
-    {
-        $addCommitSwitch = $False
-    }
-    # Set switch to get all commits under the 'Thanks to our community contributors'
-    if (($changeLog -match '^#{3} Thanks to our community contributors'))
-    {
-        $addCommitSwitch = $True
-    }
-
-    # Add commit id
-    if ($addCommitSwitch)
-    {
-        if ($changeLog -match '(#[0-9]+)') 
-        {
-            $existCommitsId += $changeLog.Substring($changeLog.LastIndexOf('('))
-        }
-    }
-}
+$changeLogContent = Get-Content -Path $changeLogFile.FullName | Out-String
 
 Write-Host -ForegroundColor Green 'Create ExternalContributors.md'
 # Create md file to store contributors information.
@@ -109,7 +76,7 @@ for ($PR = 0; $PR -lt $sortPRs.Length; $PR++) {
         $commitMessage = $sortPRs[$PR].commit.message.Substring(0, $index)
     }
     # Skip already exits commits.
-    if ($existCommitsId.Contains($commitMessage.Substring($commitMessage.LastIndexOf('('))))
+    if ($changeLogContent.Contains($commitMessage.Substring($commitMessage.LastIndexOf('('))))
     {
         # Only one of the multiple commits of the same user in this release is valuable.
         # For display format of the external contributors. 
@@ -152,5 +119,3 @@ for ($PR = 0; $PR -lt $sortPRs.Length; $PR++) {
         }
     }
 }
-
-
